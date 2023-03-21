@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
      IMAGE_FILE_HEADER and IMAGE_OPTIONAL_HEADER64 are both structs, need to print those as well
 
      */
+
     PIMAGE_NT_HEADERS64 nt_headers = (PIMAGE_NT_HEADERS64)((QWORD)fileData + dos_header->e_lfanew);
 
     printf("\n[+] NT Headers\n");
