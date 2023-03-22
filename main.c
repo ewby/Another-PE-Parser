@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     printf("\tOEM Identifier (For e_oeminfo): \t0x%x\n", dos_header->e_oemid);
     printf("\tOEM Information; e_oemid Specific: \t0x%x\n", dos_header->e_oeminfo);
     printf("\tReserved Words: \t\t\t0x%x\n", dos_header->e_res2);
-    printf("\tFile Address of New EXE Header: \t0x%x\n", dos_header->e_lfanew);
+    printf("\tFile Address of New EXE Header: \t0x%lx\n", dos_header->e_lfanew);
 
     /*
 
@@ -67,7 +67,6 @@ int main(int argc, char *argv[])
 
     PIMAGE_NT_HEADERS64 nt_headers = (PIMAGE_NT_HEADERS64)((QWORD)fileData + dos_header->e_lfanew);
     PIMAGE_OPTIONAL_HEADER64 optional_header = &(nt_headers->OptionalHeader);
-    PIMAGE_DATA_DIRECTORY data_directory = optional_header->DataDirectory;
 
     time_t timestamp = nt_headers->FileHeader.TimeDateStamp;
     char* timestr = ctime(&timestamp);
@@ -117,9 +116,27 @@ int main(int argc, char *argv[])
     printf("\tLoader Flags: \t\t\t\t0x%lx\n", optional_header->LoaderFlags);
     printf("\tNumber of RVA and Sizes: \t\t0x%lx\n", optional_header->NumberOfRvaAndSizes);
 
+    // Struct to make offset calculations easier, pointer directly to IMAGE_DIRECTORY_ENTRY_IMPORT/EXPORT is something I can't work with right now, will re-visit to understand.
+    typedef struct data_directory{
+        DWORD VirtualAddress;
+        DWORD Size;
+        DWORD RawOffset;
+        DWORD SectionVirtualAddress;
+        QWORD SectionRawAddress;
+    } data_directory;
+
+    // Split these two up, makes the below logic much easier to create
+    data_directory export_directory = {0};
+    data_directory import_directory = {0};
+
+    export_directory.VirtualAddress = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    export_directory.Size = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+
+    import_directory.VirtualAddress = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    import_directory.Size = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
+
     printf("\n[+] Data Directory\n");
-    printf("\n\tVirtual Address: \t0x%lx\n", data_directory->VirtualAddress);
-    printf("\tSize: \t\t\t0x%lx\n", data_directory->Size);
+    printf("\n\tImport Directory Virtual Address: \t%lx\n", import_directory.VirtualAddress);
 
     return 0;
 }
