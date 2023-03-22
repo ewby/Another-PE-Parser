@@ -66,21 +66,60 @@ int main(int argc, char *argv[])
      */
 
     PIMAGE_NT_HEADERS64 nt_headers = (PIMAGE_NT_HEADERS64)((QWORD)fileData + dos_header->e_lfanew);
+    PIMAGE_OPTIONAL_HEADER64 optional_header = &(nt_headers->OptionalHeader);
+    PIMAGE_DATA_DIRECTORY data_directory = optional_header->DataDirectory;
+
     time_t timestamp = nt_headers->FileHeader.TimeDateStamp;
     char* timestr = ctime(&timestamp);
 
     printf("\n[+] NT Headers\n");
     printf("\n\tSignature: %c%c\n", ((char *)&(nt_headers->Signature))[0], ((char *)&(nt_headers->Signature))[1]);
 
-    // struct-ception
+    // File Header struct-ception
     printf("\n[+] NT Headers -> File Header Struct\n");
     printf("\n\tMachine: \t\t\t%x\n", nt_headers->FileHeader.Machine);
     printf("\tNumber of Sections: \t\t%hu\n", nt_headers->FileHeader.NumberOfSections);
-    printf("\tTime Date Stamp: \t\t%08x, %s", nt_headers->FileHeader.TimeDateStamp, timestr);
+    printf("\tTime Date Stamp: \t\t0x%08lx, %s", nt_headers->FileHeader.TimeDateStamp, timestr);
     printf("\tPointer to Symbol Table: \t0x%lu\n", nt_headers->FileHeader.PointerToSymbolTable);
-    printf("\tNumber of Symbols: \t\t%x\n", nt_headers->FileHeader.NumberOfSymbols);
-    printf("\tSize of Optional Header: \t%x\n", nt_headers->FileHeader.SizeOfOptionalHeader);
-    printf("\tCharacteristics: \t\t%x\n", nt_headers->FileHeader.Characteristics);
+    printf("\tNumber of Symbols: \t\t0x%lx\n", nt_headers->FileHeader.NumberOfSymbols);
+    printf("\tSize of Optional Header: \t0x%x\n", nt_headers->FileHeader.SizeOfOptionalHeader);
+    printf("\tCharacteristics: \t\t0x%x\n", nt_headers->FileHeader.Characteristics);
+
+    // Optional Header struct-ception
+    printf("\n[+] NT Headers -> Optional Header Struct\n");
+    printf("\n\tMagic Byte: \t\t\t\t0x%x\n", optional_header->Magic); //optional_header->Magic
+    printf("\tMajor Linker Version: \t\t\t0x%x\n", optional_header->MajorLinkerVersion);
+    printf("\tMinor Linker Version: \t\t\t0x%x\n", optional_header->MinorLinkerVersion);
+    printf("\tSize of Code: \t\t\t\t0x%lx\n", optional_header->SizeOfCode);
+    printf("\tSize of Initialized Data: \t\t0x%lx\n", optional_header->SizeOfInitializedData);
+    printf("\tSize of Uninitialized Data: \t\t0x%lx\n", optional_header->SizeOfUninitializedData);
+    printf("\tAddress of Entry Point: \t\t0x%lx\n", optional_header->AddressOfEntryPoint);
+    printf("\tBase of Code: \t\t\t\t0x%lx\n", optional_header->BaseOfCode);
+    printf("\tImage Base: \t\t\t\t0x%llx\n", optional_header->ImageBase);
+    printf("\tSection Alignment: \t\t\t0x%lx\n", optional_header->SectionAlignment);
+    printf("\tFile Alignment: \t\t\t0x%lx\n", optional_header->FileAlignment);
+    printf("\tMajor Operating System Version: \t0x%x\n", optional_header->MajorOperatingSystemVersion);
+    printf("\tMinor Operating System Version: \t0x%x\n", optional_header->MinorOperatingSystemVersion);
+    printf("\tMajor Image Version: \t\t\t0x%x\n", optional_header->MajorImageVersion);
+    printf("\tMinor Image Version: \t\t\t0x%x\n", optional_header->MinorImageVersion);
+    printf("\tMajor Subsystem Version: \t\t0x%x\n", optional_header->MajorSubsystemVersion);
+    printf("\tMinor Subsystem Version: \t\t0x%x\n", optional_header->MinorSubsystemVersion);
+    printf("\tWin32 Version Value: \t\t\t0x%lx\n", optional_header->Win32VersionValue);
+    printf("\tSize of Image: \t\t\t\t0x%lx\n", optional_header->SizeOfImage);
+    printf("\tSize of Headers: \t\t\t0x%lx\n", optional_header->SizeOfHeaders);
+    printf("\tChecksum: \t\t\t\t0x%lx\n", optional_header->CheckSum);
+    printf("\tSubsystem: \t\t\t\t0x%x\n", optional_header->Subsystem);
+    printf("\tDLL Characteristics: \t\t\t0x%x\n", optional_header->DllCharacteristics);
+    printf("\tSize of Stack Reserve: \t\t\t0x%llx\n", optional_header->SizeOfStackReserve);
+    printf("\tSize of Stack Commit: \t\t\t0x%llx\n", optional_header->SizeOfStackCommit);
+    printf("\tSize of Heap Reserve: \t\t\t0x%llx\n", optional_header->SizeOfHeapReserve);
+    printf("\tSize of Heap Commit: \t\t\t0x%llx\n", optional_header->SizeOfHeapCommit);
+    printf("\tLoader Flags: \t\t\t\t0x%lx\n", optional_header->LoaderFlags);
+    printf("\tNumber of RVA and Sizes: \t\t0x%lx\n", optional_header->NumberOfRvaAndSizes);
+
+    printf("\n[+] Data Directory\n");
+    printf("\n\tVirtual Address: \t0x%lx\n", data_directory->VirtualAddress);
+    printf("\tSize: \t\t\t0x%lx\n", data_directory->Size);
 
     return 0;
 }
