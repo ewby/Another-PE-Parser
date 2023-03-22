@@ -1,5 +1,6 @@
 #include "Windows.h"
 #include <stdio.h>
+#include <time.h>
 
 // Put in a .h file
 typedef unsigned long long QWORD;
@@ -11,7 +12,7 @@ int main(int argc, char *argv[])
     LPVOID fileData = NULL;
 
     if (argc < 2) {
-        printf("Usage: %s <Address of PE file>\n", argv[0]);
+        printf("Usage: %s <Path to PE file>\n", argv[0]);
         return -1;
     }
 
@@ -50,7 +51,9 @@ int main(int argc, char *argv[])
     printf("\tReserved Words: \t\t\t0x%x\n", dos_header->e_res2);
     printf("\tFile Address of New EXE Header: \t0x%x\n", dos_header->e_lfanew);
 
-    /* Need to research why I can't use "nt_headers = (PIMAGE_NT_HEADERS64)fileData + dos_header->e_lfanew;", something about casting
+    /*
+
+     Need to research why I can't use "nt_headers = (PIMAGE_NT_HEADERS64)fileData + dos_header->e_lfanew;", something about casting
 
             typedef struct _IMAGE_NT_HEADERS64 {
           DWORD                   Signature;
@@ -63,11 +66,21 @@ int main(int argc, char *argv[])
      */
 
     PIMAGE_NT_HEADERS64 nt_headers = (PIMAGE_NT_HEADERS64)((QWORD)fileData + dos_header->e_lfanew);
+    time_t timestamp = nt_headers->FileHeader.TimeDateStamp;
+    char* timestr = ctime(&timestamp);
 
     printf("\n[+] NT Headers\n");
     printf("\n\tSignature: %c%c\n", ((char *)&(nt_headers->Signature))[0], ((char *)&(nt_headers->Signature))[1]);
+
+    // struct-ception
     printf("\n[+] NT Headers -> File Header Struct\n");
-    printf("\n\tMachine: \t%x", nt_headers->FileHeader.Machine);
+    printf("\n\tMachine: \t\t\t%x\n", nt_headers->FileHeader.Machine);
+    printf("\tNumber of Sections: \t\t%hu\n", nt_headers->FileHeader.NumberOfSections);
+    printf("\tTime Date Stamp: \t\t%08x, %s", nt_headers->FileHeader.TimeDateStamp, timestr);
+    printf("\tPointer to Symbol Table: \t0x%lu\n", nt_headers->FileHeader.PointerToSymbolTable);
+    printf("\tNumber of Symbols: \t\t%x\n", nt_headers->FileHeader.NumberOfSymbols);
+    printf("\tSize of Optional Header: \t%x\n", nt_headers->FileHeader.SizeOfOptionalHeader);
+    printf("\tCharacteristics: \t\t%x\n", nt_headers->FileHeader.Characteristics);
 
     return 0;
 }
