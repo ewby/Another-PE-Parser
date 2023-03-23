@@ -41,6 +41,8 @@ int main(int argc, char *argv[])
             CloseHandle(hFile);
             return 1;
         }
+    
+    // Get DOS Header
     pDosHeader = (PIMAGE_DOS_HEADER)lpFileBaseAddress;
         if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
         {
@@ -50,6 +52,12 @@ int main(int argc, char *argv[])
             CloseHandle(hFile);
             return 1;
         }
+
+    // Get NT Headers
+    PIMAGE_NT_HEADERS64 pNtHeaders = (PIMAGE_NT_HEADERS64)((QWORD)lpFileBaseAddress + pDosHeader->e_lfanew);
+
+    // Get Optional Header
+    PIMAGE_OPTIONAL_HEADER64 pOptionalHeader = &(pNtHeaders->OptionalHeader);
 
     // Print hexadecimal, because PE file format. %08x for 32-bit hexadecimal
     printf("\n[+] DOS Header\n");
@@ -72,92 +80,57 @@ int main(int argc, char *argv[])
     printf("\tReserved Words: \t\t\t0x%x\n", pDosHeader->e_res2);
     printf("\tFile Address of New EXE Header: \t0x%lx\n", pDosHeader->e_lfanew);
 
-    /*
-
-     Need to research why I can't use "nt_headers = (PIMAGE_NT_HEADERS64)lpFileBaseAddress + pDosHeader->e_lfanew;", something about casting
-
-            typedef struct _IMAGE_NT_HEADERS64 {
-          DWORD                   Signature;
-          IMAGE_FILE_HEADER       FileHeader;
-          IMAGE_OPTIONAL_HEADER64 OptionalHeader;
-        } IMAGE_NT_HEADERS64, *PIMAGE_NT_HEADERS64;
-
-     IMAGE_FILE_HEADER and IMAGE_OPTIONAL_HEADER64 are both structs, need to print those as well
-
-     */
-
-    PIMAGE_NT_HEADERS64 nt_headers = (PIMAGE_NT_HEADERS64)((QWORD)lpFileBaseAddress + pDosHeader->e_lfanew);
-    PIMAGE_OPTIONAL_HEADER64 optional_header = &(nt_headers->OptionalHeader);
-
-    time_t timestamp = nt_headers->FileHeader.TimeDateStamp;
+    time_t timestamp = pNtHeaders->FileHeader.TimeDateStamp;
     char* timestr = ctime(&timestamp);
 
     printf("\n[+] NT Headers\n");
-    printf("\n\tSignature: %c%c\n", ((char *)&(nt_headers->Signature))[0], ((char *)&(nt_headers->Signature))[1]);
+    printf("\n\tSignature: %c%c\n", ((char *)&(pNtHeaders->Signature))[0], ((char *)&(pNtHeaders->Signature))[1]);
 
     // File Header struct-ception
     printf("\n[+] NT Headers -> File Header Struct\n");
-    printf("\n\tMachine: \t\t\t%x\n", nt_headers->FileHeader.Machine);
-    printf("\tNumber of Sections: \t\t%hu\n", nt_headers->FileHeader.NumberOfSections);
-    printf("\tTime Date Stamp: \t\t0x%08lx, %s", nt_headers->FileHeader.TimeDateStamp, timestr);
-    printf("\tPointer to Symbol Table: \t0x%lu\n", nt_headers->FileHeader.PointerToSymbolTable);
-    printf("\tNumber of Symbols: \t\t0x%lx\n", nt_headers->FileHeader.NumberOfSymbols);
-    printf("\tSize of Optional Header: \t0x%x\n", nt_headers->FileHeader.SizeOfOptionalHeader);
-    printf("\tCharacteristics: \t\t0x%x\n", nt_headers->FileHeader.Characteristics);
+    printf("\n\tMachine: \t\t\t%x\n", pNtHeaders->FileHeader.Machine);
+    printf("\tNumber of Sections: \t\t%hu\n", pNtHeaders->FileHeader.NumberOfSections);
+    printf("\tTime Date Stamp: \t\t0x%08lx, %s", pNtHeaders->FileHeader.TimeDateStamp, timestr);
+    printf("\tPointer to Symbol Table: \t0x%lu\n", pNtHeaders->FileHeader.PointerToSymbolTable);
+    printf("\tNumber of Symbols: \t\t0x%lx\n", pNtHeaders->FileHeader.NumberOfSymbols);
+    printf("\tSize of Optional Header: \t0x%x\n", pNtHeaders->FileHeader.SizeOfOptionalHeader);
+    printf("\tCharacteristics: \t\t0x%x\n", pNtHeaders->FileHeader.Characteristics);
 
     // Optional Header struct-ception
     printf("\n[+] NT Headers -> Optional Header Struct\n");
-    printf("\n\tMagic Byte: \t\t\t\t0x%x\n", optional_header->Magic); //optional_header->Magic
-    printf("\tMajor Linker Version: \t\t\t0x%x\n", optional_header->MajorLinkerVersion);
-    printf("\tMinor Linker Version: \t\t\t0x%x\n", optional_header->MinorLinkerVersion);
-    printf("\tSize of Code: \t\t\t\t0x%lx\n", optional_header->SizeOfCode);
-    printf("\tSize of Initialized Data: \t\t0x%lx\n", optional_header->SizeOfInitializedData);
-    printf("\tSize of Uninitialized Data: \t\t0x%lx\n", optional_header->SizeOfUninitializedData);
-    printf("\tAddress of Entry Point: \t\t0x%lx\n", optional_header->AddressOfEntryPoint);
-    printf("\tBase of Code: \t\t\t\t0x%lx\n", optional_header->BaseOfCode);
-    printf("\tImage Base: \t\t\t\t0x%llx\n", optional_header->ImageBase);
-    printf("\tSection Alignment: \t\t\t0x%lx\n", optional_header->SectionAlignment);
-    printf("\tFile Alignment: \t\t\t0x%lx\n", optional_header->FileAlignment);
-    printf("\tMajor Operating System Version: \t0x%x\n", optional_header->MajorOperatingSystemVersion);
-    printf("\tMinor Operating System Version: \t0x%x\n", optional_header->MinorOperatingSystemVersion);
-    printf("\tMajor Image Version: \t\t\t0x%x\n", optional_header->MajorImageVersion);
-    printf("\tMinor Image Version: \t\t\t0x%x\n", optional_header->MinorImageVersion);
-    printf("\tMajor Subsystem Version: \t\t0x%x\n", optional_header->MajorSubsystemVersion);
-    printf("\tMinor Subsystem Version: \t\t0x%x\n", optional_header->MinorSubsystemVersion);
-    printf("\tWin32 Version Value: \t\t\t0x%lx\n", optional_header->Win32VersionValue);
-    printf("\tSize of Image: \t\t\t\t0x%lx\n", optional_header->SizeOfImage);
-    printf("\tSize of Headers: \t\t\t0x%lx\n", optional_header->SizeOfHeaders);
-    printf("\tChecksum: \t\t\t\t0x%lx\n", optional_header->CheckSum);
-    printf("\tSubsystem: \t\t\t\t0x%x\n", optional_header->Subsystem);
-    printf("\tDLL Characteristics: \t\t\t0x%x\n", optional_header->DllCharacteristics);
-    printf("\tSize of Stack Reserve: \t\t\t0x%llx\n", optional_header->SizeOfStackReserve);
-    printf("\tSize of Stack Commit: \t\t\t0x%llx\n", optional_header->SizeOfStackCommit);
-    printf("\tSize of Heap Reserve: \t\t\t0x%llx\n", optional_header->SizeOfHeapReserve);
-    printf("\tSize of Heap Commit: \t\t\t0x%llx\n", optional_header->SizeOfHeapCommit);
-    printf("\tLoader Flags: \t\t\t\t0x%lx\n", optional_header->LoaderFlags);
-    printf("\tNumber of RVA and Sizes: \t\t0x%lx\n", optional_header->NumberOfRvaAndSizes);
+    printf("\n\tMagic Byte: \t\t\t\t0x%x\n", pOptionalHeader->Magic);
+    printf("\tMajor Linker Version: \t\t\t0x%x\n", pOptionalHeader->MajorLinkerVersion);
+    printf("\tMinor Linker Version: \t\t\t0x%x\n", pOptionalHeader->MinorLinkerVersion);
+    printf("\tSize of Code: \t\t\t\t0x%lx\n", pOptionalHeader->SizeOfCode);
+    printf("\tSize of Initialized Data: \t\t0x%lx\n", pOptionalHeader->SizeOfInitializedData);
+    printf("\tSize of Uninitialized Data: \t\t0x%lx\n", pOptionalHeader->SizeOfUninitializedData);
+    printf("\tAddress of Entry Point: \t\t0x%lx\n", pOptionalHeader->AddressOfEntryPoint);
+    printf("\tBase of Code: \t\t\t\t0x%lx\n", pOptionalHeader->BaseOfCode);
+    printf("\tImage Base: \t\t\t\t0x%llx\n", pOptionalHeader->ImageBase);
+    printf("\tSection Alignment: \t\t\t0x%lx\n", pOptionalHeader->SectionAlignment);
+    printf("\tFile Alignment: \t\t\t0x%lx\n", pOptionalHeader->FileAlignment);
+    printf("\tMajor Operating System Version: \t0x%x\n", pOptionalHeader->MajorOperatingSystemVersion);
+    printf("\tMinor Operating System Version: \t0x%x\n", pOptionalHeader->MinorOperatingSystemVersion);
+    printf("\tMajor Image Version: \t\t\t0x%x\n", pOptionalHeader->MajorImageVersion);
+    printf("\tMinor Image Version: \t\t\t0x%x\n", pOptionalHeader->MinorImageVersion);
+    printf("\tMajor Subsystem Version: \t\t0x%x\n", pOptionalHeader->MajorSubsystemVersion);
+    printf("\tMinor Subsystem Version: \t\t0x%x\n", pOptionalHeader->MinorSubsystemVersion);
+    printf("\tWin32 Version Value: \t\t\t0x%lx\n", pOptionalHeader->Win32VersionValue);
+    printf("\tSize of Image: \t\t\t\t0x%lx\n", pOptionalHeader->SizeOfImage);
+    printf("\tSize of Headers: \t\t\t0x%lx\n", pOptionalHeader->SizeOfHeaders);
+    printf("\tChecksum: \t\t\t\t0x%lx\n", pOptionalHeader->CheckSum);
+    printf("\tSubsystem: \t\t\t\t0x%x\n", pOptionalHeader->Subsystem);
+    printf("\tDLL Characteristics: \t\t\t0x%x\n", pOptionalHeader->DllCharacteristics);
+    printf("\tSize of Stack Reserve: \t\t\t0x%llx\n", pOptionalHeader->SizeOfStackReserve);
+    printf("\tSize of Stack Commit: \t\t\t0x%llx\n", pOptionalHeader->SizeOfStackCommit);
+    printf("\tSize of Heap Reserve: \t\t\t0x%llx\n", pOptionalHeader->SizeOfHeapReserve);
+    printf("\tSize of Heap Commit: \t\t\t0x%llx\n", pOptionalHeader->SizeOfHeapCommit);
+    printf("\tLoader Flags: \t\t\t\t0x%lx\n", pOptionalHeader->LoaderFlags);
+    printf("\tNumber of RVA and Sizes: \t\t0x%lx\n", pOptionalHeader->NumberOfRvaAndSizes);
 
-    // Struct to make offset calculations easier, pointer directly to IMAGE_DIRECTORY_ENTRY_IMPORT/EXPORT is something I can't work with right now, will re-visit to understand.
-    typedef struct data_directory{
-        DWORD VirtualAddress;
-        DWORD Size;
-        DWORD RawOffset;
-        DWORD SectionVirtualAddress;
-        QWORD SectionRawAddress;
-    } data_directory;
-
-    // Split these two up, makes the below logic much easier to create
-    data_directory export_directory = {0};
-    data_directory import_directory = {0};
-
-    export_directory.VirtualAddress = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-    export_directory.Size = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
-
-    import_directory.VirtualAddress = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-    import_directory.Size = (DWORD)nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
-
+    
     printf("\n[+] Data Directory\n");
-    printf("\n\tImport Directory Virtual Address: \t%lx\n", import_directory.VirtualAddress);
+    printf("\n\tImport Directory Virtual Address: \t%lx\n");
 
     return 0;
 }
