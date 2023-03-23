@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-    // Get NT Headers
+    // Get NT Headers using NT Headers start offset located in the DOS header added to the file base
     PIMAGE_NT_HEADERS64 pNtHeaders = (PIMAGE_NT_HEADERS64)((BYTE*)lpFileBaseAddress + pDosHeader->e_lfanew);
 
     // Get Optional Header. This is an extra step purely just to practice messing with the data, in future projects I'll skip directly to the Import Table.
@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     // Get Import Table from Optional Header
     PIMAGE_DATA_DIRECTORY pImportDir = &pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 
-    // Get Import Descriptor and parse
+    // Get Import Descriptor using it's RVA from the file base
     PIMAGE_IMPORT_DESCRIPTOR pImportDesc = (PIMAGE_IMPORT_DESCRIPTOR)((BYTE*)lpFileBaseAddress + pImportDir->VirtualAddress);
 
     // Print values, sticking to hex where reasonable
@@ -155,13 +155,15 @@ int main(int argc, char *argv[])
     if (pImportDir->VirtualAddress != 0)
     {
         printf("\n[+] Import Table:\n");
+        char* pImportName = (char*)((BYTE*)lpFileBaseAddress + pImportDesc->Name);
+        printf("testing %s", pImportName);
 
-        while (pImportDesc->Name != 0)
+        for (; pImportDesc->Name != 0; (PIMAGE_IMPORT_DESCRIPTOR)pImportDesc++)
         {
-            char* pImportName = (char*)((BYTE*)lpFileBaseAddress + pImportDesc->Name);
+            //char* pImportName = (char*)((BYTE*)lpFileBaseAddress + pImportDesc->Name);
             PIMAGE_THUNK_DATA pThunk = (PIMAGE_THUNK_DATA)((BYTE*)lpFileBaseAddress + pImportDesc->OriginalFirstThunk);
 
-            printf("Name: \t%x\n", pImportName); //%s doesn't print anything...whyyyyy
+            //printf("Name: \t%s\n", pImportName); //%s doesn't print anything...whyyyyy
 
             if (pThunk == 0)
             {
