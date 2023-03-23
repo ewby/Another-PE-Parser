@@ -2,12 +2,9 @@
 #include <stdio.h>
 #include <time.h>
 
-// Put in a .h file
-typedef unsigned long long QWORD;
-
 int main(int argc, char *argv[])
 {
-    PIMAGE_DOS_HEADER pDosHeader = NULL; //was {}
+    PIMAGE_DOS_HEADER pDosHeader = NULL;
     HANDLE hFile, hFileMap;
     LPVOID lpFileBaseAddress = NULL;
 
@@ -54,12 +51,21 @@ int main(int argc, char *argv[])
         }
 
     // Get NT Headers
-    PIMAGE_NT_HEADERS64 pNtHeaders = (PIMAGE_NT_HEADERS64)((QWORD)lpFileBaseAddress + pDosHeader->e_lfanew);
+    PIMAGE_NT_HEADERS64 pNtHeaders = (PIMAGE_NT_HEADERS64)((BYTE*)lpFileBaseAddress + pDosHeader->e_lfanew);
 
-    // Get Optional Header
-    PIMAGE_OPTIONAL_HEADER64 pOptionalHeader = &(pNtHeaders->OptionalHeader);
+    // Get Optional Header. This is an extra step purely just to practice messing with the data, in future projects I'll skip directly to the Import Table.
+    PIMAGE_OPTIONAL_HEADER64 pOptionalHeader = &pNtHeaders->OptionalHeader;
 
-    // Print hexadecimal, because PE file format. %08x for 32-bit hexadecimal
+    // Get Import Table from Optional Header
+    PIMAGE_DATA_DIRECTORY pImportTable = &pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+
+        // Get Import Descriptor
+        if (pImportTable->VirtualAddress != 0)
+        {
+            PIMAGE_IMPORT_DESCRIPTOR pImportDesc = (PIMAGE_IMPORT_DESCRIPTOR)((BYTE*)lpFileBaseAddress + pImportTable->VirtualAddress);
+        }
+
+    // Print values, sticking to hex where reasonable
     printf("\n[+] DOS Header\n");
     printf("\n\tMagic Number: \t\t\t\t0x%x\n", pDosHeader->e_magic);
     printf("\tBytes on Last Page of File: \t\t0x%x\n", pDosHeader->e_cblp);
@@ -80,6 +86,7 @@ int main(int argc, char *argv[])
     printf("\tReserved Words: \t\t\t0x%x\n", pDosHeader->e_res2);
     printf("\tFile Address of New EXE Header: \t0x%lx\n", pDosHeader->e_lfanew);
 
+    // Nicer printing of PE timestamp
     time_t timestamp = pNtHeaders->FileHeader.TimeDateStamp;
     char* timestr = ctime(&timestamp);
 
@@ -130,7 +137,7 @@ int main(int argc, char *argv[])
 
     
     printf("\n[+] Data Directory\n");
-    printf("\n\tImport Directory Virtual Address: \t%lx\n");
+    printf("\n\tImport Directory Virtual Address: \t%lx\n", pImportTable->VirtualAddress);
 
     return 0;
 }
