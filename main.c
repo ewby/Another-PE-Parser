@@ -7,53 +7,74 @@ typedef unsigned long long QWORD;
 
 int main(int argc, char *argv[])
 {
-    PIMAGE_DOS_HEADER dos_header = NULL; //was {}
+    PIMAGE_DOS_HEADER pDosHeader = NULL; //was {}
     HANDLE hFile, hFileMap;
-    LPVOID fileData = NULL;
+    LPVOID lpFileBaseAddress = NULL;
 
-    if (argc < 2) {
+    if (argc < 2)
+    {
         printf("Usage: %s <Path to PE file>\n", argv[0]);
         return -1;
     }
 
     hFile = CreateFileA(argv[1], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-    if (hFile == INVALID_HANDLE_VALUE)
-        return -1;
+        if (hFile == INVALID_HANDLE_VALUE)
+        {
+            printf("Failed to open the PE file: %s\n", argv[1]);
+            return 1;
+        }
 
     // Map file for memory efficiency and ease of access to pointers for PE sections
     hFileMap = CreateFileMapping(hFile, 0, PAGE_READONLY, 0, 0, NULL);
-    if (hFileMap == INVALID_HANDLE_VALUE)
-        return -1;
+        if (hFileMap == INVALID_HANDLE_VALUE)
+        {
+            printf("Failed to map the PE file into memory\n");
+            CloseHandle(hFile);
+            return 1;
+        }
 
-    fileData = MapViewOfFile(hFileMap, FILE_MAP_READ, 0, 0, 0);
-
-    dos_header = (PIMAGE_DOS_HEADER)fileData;
+    lpFileBaseAddress = MapViewOfFile(hFileMap, FILE_MAP_READ, 0, 0, 0);
+        if (lpFileBaseAddress == NULL)
+        {
+            printf("Failed to map the PE file into memory\n");
+            CloseHandle(hFileMap);
+            CloseHandle(hFile);
+            return 1;
+        }
+    pDosHeader = (PIMAGE_DOS_HEADER)lpFileBaseAddress;
+        if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+        {
+            printf("Invalid DOS header\n");
+            UnmapViewOfFile(lpFileBaseAddress);
+            CloseHandle(hFileMap);
+            CloseHandle(hFile);
+            return 1;
+        }
 
     // Print hexadecimal, because PE file format. %08x for 32-bit hexadecimal
     printf("\n[+] DOS Header\n");
-    printf("\n\tMagic Number: \t\t\t\t0x%x\n", dos_header->e_magic);
-    printf("\tBytes on Last Page of File: \t\t0x%x\n", dos_header->e_cblp);
-    printf("\tPages in File: \t\t\t\t0x%x\n", dos_header->e_cp);
-    printf("\tRelocations: \t\t\t\t0x%x\n", dos_header->e_crlc);
-    printf("\tSize of Header in Paragraphs: \t\t0x%x\n", dos_header->e_cparhdr);
-    printf("\tMinimum Extra Paragraphs Needed: \t0x%x\n", dos_header->e_minalloc);
-    printf("\tMaximum Extra Paragraphs Needed: \t0x%x\n", dos_header->e_maxalloc);
-    printf("\tInitial (Relative) SS Value: \t\t0x%x\n", dos_header->e_ss);
-    printf("\tInitial SP Value: \t\t\t0x%x\n", dos_header->e_sp);
-    printf("\tChecksum: \t\t\t\t0x%x\n", dos_header->e_csum);
-    printf("\tInitial IP Value: \t\t\t0x%x\n", dos_header->e_ip);
-    printf("\tInitial (Relative) CS Value: \t\t0x%x\n", dos_header->e_cs);
-    printf("\tFile Address of Relocation Table: \t0x%x\n", dos_header->e_lfarlc);
-    printf("\tOverlay Number: \t\t\t0x%x\n", dos_header->e_ovno);
-    printf("\tOEM Identifier (For e_oeminfo): \t0x%x\n", dos_header->e_oemid);
-    printf("\tOEM Information; e_oemid Specific: \t0x%x\n", dos_header->e_oeminfo);
-    printf("\tReserved Words: \t\t\t0x%x\n", dos_header->e_res2);
-    printf("\tFile Address of New EXE Header: \t0x%lx\n", dos_header->e_lfanew);
+    printf("\n\tMagic Number: \t\t\t\t0x%x\n", pDosHeader->e_magic);
+    printf("\tBytes on Last Page of File: \t\t0x%x\n", pDosHeader->e_cblp);
+    printf("\tPages in File: \t\t\t\t0x%x\n", pDosHeader->e_cp);
+    printf("\tRelocations: \t\t\t\t0x%x\n", pDosHeader->e_crlc);
+    printf("\tSize of Header in Paragraphs: \t\t0x%x\n", pDosHeader->e_cparhdr);
+    printf("\tMinimum Extra Paragraphs Needed: \t0x%x\n", pDosHeader->e_minalloc);
+    printf("\tMaximum Extra Paragraphs Needed: \t0x%x\n", pDosHeader->e_maxalloc);
+    printf("\tInitial (Relative) SS Value: \t\t0x%x\n", pDosHeader->e_ss);
+    printf("\tInitial SP Value: \t\t\t0x%x\n", pDosHeader->e_sp);
+    printf("\tChecksum: \t\t\t\t0x%x\n", pDosHeader->e_csum);
+    printf("\tInitial IP Value: \t\t\t0x%x\n", pDosHeader->e_ip);
+    printf("\tInitial (Relative) CS Value: \t\t0x%x\n", pDosHeader->e_cs);
+    printf("\tFile Address of Relocation Table: \t0x%x\n", pDosHeader->e_lfarlc);
+    printf("\tOverlay Number: \t\t\t0x%x\n", pDosHeader->e_ovno);
+    printf("\tOEM Identifier (For e_oeminfo): \t0x%x\n", pDosHeader->e_oemid);
+    printf("\tOEM Information; e_oemid Specific: \t0x%x\n", pDosHeader->e_oeminfo);
+    printf("\tReserved Words: \t\t\t0x%x\n", pDosHeader->e_res2);
+    printf("\tFile Address of New EXE Header: \t0x%lx\n", pDosHeader->e_lfanew);
 
     /*
 
-     Need to research why I can't use "nt_headers = (PIMAGE_NT_HEADERS64)fileData + dos_header->e_lfanew;", something about casting
+     Need to research why I can't use "nt_headers = (PIMAGE_NT_HEADERS64)lpFileBaseAddress + pDosHeader->e_lfanew;", something about casting
 
             typedef struct _IMAGE_NT_HEADERS64 {
           DWORD                   Signature;
@@ -65,7 +86,7 @@ int main(int argc, char *argv[])
 
      */
 
-    PIMAGE_NT_HEADERS64 nt_headers = (PIMAGE_NT_HEADERS64)((QWORD)fileData + dos_header->e_lfanew);
+    PIMAGE_NT_HEADERS64 nt_headers = (PIMAGE_NT_HEADERS64)((QWORD)lpFileBaseAddress + pDosHeader->e_lfanew);
     PIMAGE_OPTIONAL_HEADER64 optional_header = &(nt_headers->OptionalHeader);
 
     time_t timestamp = nt_headers->FileHeader.TimeDateStamp;
