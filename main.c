@@ -57,13 +57,10 @@ int main(int argc, char *argv[])
     PIMAGE_OPTIONAL_HEADER64 pOptionalHeader = &pNtHeaders->OptionalHeader;
 
     // Get Import Table from Optional Header
-    PIMAGE_DATA_DIRECTORY pImportTable = &pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    PIMAGE_DATA_DIRECTORY pImportDir = &pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 
-        // Get Import Descriptor
-        if (pImportTable->VirtualAddress != 0)
-        {
-            PIMAGE_IMPORT_DESCRIPTOR pImportDesc = (PIMAGE_IMPORT_DESCRIPTOR)((BYTE*)lpFileBaseAddress + pImportTable->VirtualAddress);
-        }
+    // Get Import Descriptor and parse
+    PIMAGE_IMPORT_DESCRIPTOR pImportDesc = (PIMAGE_IMPORT_DESCRIPTOR)((BYTE*)lpFileBaseAddress + pImportDir->VirtualAddress);
 
     // Print values, sticking to hex where reasonable
     printf("\n[+] DOS Header\n");
@@ -137,7 +134,60 @@ int main(int argc, char *argv[])
 
     
     printf("\n[+] Data Directory\n");
-    printf("\n\tImport Directory Virtual Address: \t%lx\n", pImportTable->VirtualAddress);
+    printf("\n\tImport Directory Virtual Address: \t%lx\n", pImportDir->VirtualAddress);
+
+    /*
+
+    printf("\n[+] Import Table");
+    if (pImportTable->VirtualAddress != 0)
+        {
+            while (pImportDesc->Name != 0)
+            {
+                char* pImportName = (char*)((BYTE*)lpFileBaseAddress + pImportDesc->Name);
+                printf("\n\tName: \t%s", pImportName);
+            }
+        }
+    printf("\n[+] testing \t%s", pImportDesc->Name);
+
+    */
+
+    // Parse the import table
+    if (pImportDir->VirtualAddress != 0)
+    {
+        printf("\n[+] Import Table:\n");
+
+        while (pImportDesc->Name != 0)
+        {
+            char* pImportName = (char*)((BYTE*)lpFileBaseAddress + pImportDesc->Name);
+            PIMAGE_THUNK_DATA pThunk = (PIMAGE_THUNK_DATA)((BYTE*)lpFileBaseAddress + pImportDesc->OriginalFirstThunk);
+
+            printf("Name: \t%x\n", pImportName); //%s doesn't print anything...whyyyyy
+
+            if (pThunk == 0)
+            {
+                pThunk = (PIMAGE_THUNK_DATA)((BYTE*)lpFileBaseAddress + pImportDesc->FirstThunk);
+            }
+
+            while (pThunk->u1.AddressOfData != 0)
+            {
+                if (pThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                {
+                    printf("    Ordinal: 0x%llx\n", IMAGE_ORDINAL(pThunk->u1.Ordinal));
+                }
+                else
+                {
+                    PIMAGE_IMPORT_BY_NAME pImportByName = (PIMAGE_IMPORT_BY_NAME)((BYTE*)lpFileBaseAddress + pThunk->u1.AddressOfData);
+                    printf("    Function: %s\n", pImportByName->Name);
+                }
+
+                pThunk++; // increment the pointer to next entry
+            }
+            pImportDesc++; // increment the pointer to next descriptor
+        }
+    }
+    else {
+        printf("Import table not found\n");
+    }
 
     return 0;
 }
