@@ -4,17 +4,24 @@
 
 int main(int argc, char *argv[])
 {
-    PIMAGE_DOS_HEADER pDosHeader = NULL;
+    PIMAGE_DOS_HEADER pDosHeader;
     HANDLE hFile, hFileMap;
-    LPVOID lpFileBaseAddress = NULL;
+    LPVOID lpFileBaseAddress;
+    unsigned long long QWORD;
 
+    /*
+
+     // Uncomment when done debugging
     if (argc < 2)
     {
         printf("Usage: %s <Path to PE file>\n", argv[0]);
         return -1;
     }
 
-    hFile = CreateFileA(argv[1], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+     */
+
+    // argv[1] originally under lpFileName, testing hard set file for debugging purposes
+    hFile = CreateFileA("C:\\Users\\cody\\CLionProjects\\Another-PE-Parser\\cmake-build-debug\\Another_PE_Parser.exe", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hFile == INVALID_HANDLE_VALUE)
         {
             printf("Failed to open the PE file: %s\n", argv[1]);
@@ -57,10 +64,26 @@ int main(int argc, char *argv[])
     PIMAGE_OPTIONAL_HEADER64 pOptionalHeader = &pNtHeaders->OptionalHeader;
 
     // Get Import Table from Optional Header
-    PIMAGE_DATA_DIRECTORY pImportDir = &pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    PIMAGE_DATA_DIRECTORY pDataDir = &pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+
+    // Check if the Import Directory exists in the PE file. Had a huge headache with this, might remove at the end of this project.
+    if (pDataDir->VirtualAddress == 0 || pDataDir->Size == 0)
+    {
+        printf("Data Directory Not Found!");
+        // Import Directory not found
+        return 1;
+    }
 
     // Get Import Descriptor using it's RVA from the file base
-    PIMAGE_IMPORT_DESCRIPTOR pImportDesc = (PIMAGE_IMPORT_DESCRIPTOR)((BYTE*)lpFileBaseAddress + pImportDir->VirtualAddress);
+    PIMAGE_IMPORT_DESCRIPTOR pImportDesc = (PIMAGE_IMPORT_DESCRIPTOR)(lpFileBaseAddress + pDataDir->VirtualAddress);
+
+    if (pImportDesc != NULL) {
+        // use pImportDesc here
+        printf("pImportDesc ISN'T NULL");
+    }
+    else {
+        // handle null pointer
+    }
 
     // Print values, sticking to hex where reasonable
     printf("\n[+] DOS Header\n");
@@ -84,8 +107,8 @@ int main(int argc, char *argv[])
     printf("\tFile Address of New EXE Header: \t0x%lx\n", pDosHeader->e_lfanew);
 
     // Nicer printing of PE timestamp
-    time_t timestamp = pNtHeaders->FileHeader.TimeDateStamp;
-    char* timestr = ctime(&timestamp);
+    //time_t timestamp = pNtHeaders->FileHeader.TimeDateStamp;
+    //char* timestr = ctime(&timestamp);
 
     printf("\n[+] NT Headers\n");
     printf("\n\tSignature: %c%c\n", ((char *)&(pNtHeaders->Signature))[0], ((char *)&(pNtHeaders->Signature))[1]);
@@ -94,7 +117,7 @@ int main(int argc, char *argv[])
     printf("\n[+] NT Headers -> File Header Struct\n");
     printf("\n\tMachine: \t\t\t%x\n", pNtHeaders->FileHeader.Machine);
     printf("\tNumber of Sections: \t\t%hu\n", pNtHeaders->FileHeader.NumberOfSections);
-    printf("\tTime Date Stamp: \t\t0x%08lx, %s", pNtHeaders->FileHeader.TimeDateStamp, timestr);
+    printf("\tTime Date Stamp: \t\t0x%08lx", pNtHeaders->FileHeader.TimeDateStamp);
     printf("\tPointer to Symbol Table: \t0x%lu\n", pNtHeaders->FileHeader.PointerToSymbolTable);
     printf("\tNumber of Symbols: \t\t0x%lx\n", pNtHeaders->FileHeader.NumberOfSymbols);
     printf("\tSize of Optional Header: \t0x%x\n", pNtHeaders->FileHeader.SizeOfOptionalHeader);
@@ -134,7 +157,7 @@ int main(int argc, char *argv[])
 
     
     printf("\n[+] Data Directory\n");
-    printf("\n\tImport Directory Virtual Address: \t%lx\n", pImportDir->VirtualAddress);
+    printf("\n\tImport Directory Virtual Address: \t%lx\n", pDataDir->VirtualAddress);
 
     /*
 
@@ -152,27 +175,47 @@ int main(int argc, char *argv[])
     */
 
     // Parse the import table
-    if (pImportDir->VirtualAddress != 0)
+    if (pDataDir->VirtualAddress != 0)
     {
         printf("\n[+] Import Table:\n");
-        char* pImportName = (char*)((BYTE*)lpFileBaseAddress + pImportDesc->Name);
-        printf("testing %s", pImportName);
 
         for (; pImportDesc->Name != 0; (PIMAGE_IMPORT_DESCRIPTOR)pImportDesc++)
         {
-            //char* pImportName = (char*)((BYTE*)lpFileBaseAddress + pImportDesc->Name);
-            PIMAGE_THUNK_DATA pThunk = (PIMAGE_THUNK_DATA)((BYTE*)lpFileBaseAddress + pImportDesc->OriginalFirstThunk);
+            PIMAGE_THUNK_DATA64 pThunk = (PIMAGE_THUNK_DATA64)((BYTE*)lpFileBaseAddress + pImportDesc->OriginalFirstThunk);
+            printf("I'm here 1, can I print pImportDesc->OriginalFirstThunk and pThunk?: %lx %x\n", pImportDesc->OriginalFirstThunk, pThunk);
 
-            //printf("Name: \t%s\n", pImportName); //%s doesn't print anything...whyyyyy
-
-            if (pThunk == 0)
+            // check that pThunk is not null and is properly aligned
+            if (pThunk == NULL || ((DWORD_PTR)pThunk & 0x07) != 0)
             {
-                pThunk = (PIMAGE_THUNK_DATA)((BYTE*)lpFileBaseAddress + pImportDesc->FirstThunk);
+                printf("Invalid pThunk pointer!\n");
+                break;
             }
-
+            else
+            {
+                printf("((DWORD_PTR)pThunk & 0x07) Testing: %llx\n", ((DWORD_PTR)pThunk & 0x07));
+            }
+            printf("I'm here 2, printing pThunk->u1.Ordinal to debug loop: %llx\n", pThunk->u1.Ordinal);
+            // iterate over the thunk data
+            for (; pThunk->u1.AddressOfData != 0; pThunk++)
+            {
+                // check if the high-order bit is set (i.e., it's an ordinal value)
+                if (pThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG64)
+                {
+                    printf("Ordinal: %llx\n", pThunk->u1.Ordinal & 0xFFFF);
+                }
+                else
+                {
+                    PIMAGE_IMPORT_BY_NAME pImport = (PIMAGE_IMPORT_BY_NAME)((LPBYTE)lpFileBaseAddress + pThunk->u1.AddressOfData);
+                    printf("Function: %x\n", pImport->Name);
+                    printf("AddressOfData Value: %llx\n", pThunk->u1.AddressOfData);
+                }
+            }
+        }
+    }
+            /*
             while (pThunk->u1.AddressOfData != 0)
             {
-                if (pThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                if (pThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG64)
                 {
                     printf("    Ordinal: 0x%llx\n", IMAGE_ORDINAL(pThunk->u1.Ordinal));
                 }
@@ -190,6 +233,7 @@ int main(int argc, char *argv[])
     else {
         printf("Import table not found\n");
     }
+*/
 
     return 0;
 }
